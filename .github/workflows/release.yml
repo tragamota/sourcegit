@@ -43,10 +43,27 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: package.*
-          path: packages
+          path: release
           merge-multiple: true
+      - name: Verify Linux release assets
+        shell: bash
+        run: |
+          mapfile -t appimages < <(find release -maxdepth 1 -type f -name '*.AppImage' -print)
+          mapfile -t rpms < <(find release -maxdepth 1 -type f -name '*.rpm' -print)
+
+          if (( ${#appimages[@]} == 0 )); then
+            echo "No AppImage was found in the release folder" >&2
+            exit 1
+          fi
+          if (( ${#rpms[@]} == 0 )); then
+            echo "No RPM was found in the release folder" >&2
+            exit 1
+          fi
+
+          printf 'AppImage release assets:\n%s\n' "${appimages[*]}"
+          printf 'RPM release assets:\n%s\n' "${rpms[*]}"
       - name: Upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: gh release upload "$TAG" packages/*
+        run: gh release upload "$TAG" release/*

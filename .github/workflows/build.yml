@@ -21,11 +21,11 @@ jobs:
           - name: Linux
             os: ubuntu-latest
             runtime: linux-x64
-            container: ubuntu:20.04
+            container: registry.access.redhat.com/ubi8/ubi:8.10
           - name: Linux (arm64)
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             runtime: linux-arm64
-            container: ubuntu:20.04
+            container: registry.access.redhat.com/ubi8/ubi:8.10
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container || '' }}
@@ -33,11 +33,28 @@ jobs:
       - name: Install common CLI tools
         if: startsWith(matrix.runtime, 'linux-')
         run: |
-          export DEBIAN_FRONTEND=noninteractive
-          ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-          apt-get update
-          apt-get install -y sudo
-          sudo apt-get install -y curl wget git unzip zip libicu66 tzdata clang
+          dnf install -y \
+            binutils \
+            ca-certificates \
+            clang \
+            curl \
+            findutils \
+            gcc \
+            git \
+            gzip \
+            krb5-libs \
+            libgcc \
+            libicu \
+            libstdc++-devel \
+            openssl-libs \
+            tar \
+            tzdata \
+            unzip \
+            wget \
+            zip \
+            zlib \
+            zlib-devel
+          dnf clean all
       - name: Checkout sources
         uses: actions/checkout@v6
         with:
@@ -46,25 +63,34 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-      - name: Configure arm64 packages
-        if: matrix.runtime == 'linux-arm64'
-        run: |
-          sudo dpkg --add-architecture arm64
-          echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal main restricted
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-updates main restricted
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-backports main restricted' \
-          | sudo tee /etc/apt/sources.list.d/arm64.list
-          sudo sed -i -e 's/^deb http/deb [arch=amd64] http/g' /etc/apt/sources.list
-          sudo sed -i -e 's/^deb mirror/deb [arch=amd64] mirror/g' /etc/apt/sources.list
-      - name: Install cross-compiling dependencies
-        if: matrix.runtime == 'linux-arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm gcc-aarch64-linux-gnu
       - name: Build
         run: dotnet build -c Release
       - name: Publish
         run: dotnet publish src/SourceGit.csproj -c Release -o publish -r ${{ matrix.runtime }}
+      - name: Verify glibc 2.28 compatibility
+        if: startsWith(matrix.runtime, 'linux-')
+        shell: bash
+        run: |
+          system_glibc="$(getconf GNU_LIBC_VERSION | awk '{print $2}')"
+          if [[ "$system_glibc" != "2.28" ]]; then
+            echo "Expected the Linux build container to use glibc 2.28, found $system_glibc" >&2
+            exit 1
+          fi
+
+          max_glibc="$(readelf --version-info publish/SourceGit \
+            | sed -n 's/.*Name: GLIBC_\([0-9.]*\).*/\1/p' \
+            | sort -V \
+            | tail -n 1)"
+          if [[ -z "$max_glibc" ]]; then
+            echo "Could not determine the glibc symbol versions required by SourceGit" >&2
+            exit 1
+          fi
+
+          if [[ "$(printf '%s\n' "$max_glibc" '2.28' | sort -V | tail -n 1)" != "2.28" ]]; then
+            echo "SourceGit requires glibc $max_glibc, which is newer than 2.28" >&2
+            exit 1
+          fi
+          echo "Highest required glibc symbol version: $max_glibc (limit: 2.28)"
       - name: Rename executable file
         if: startsWith(matrix.runtime, 'linux-')
         run: mv publish/SourceGit publish/sourcegit
