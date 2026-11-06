@@ -12,9 +12,6 @@ jobs:
           - name: Windows ARM64
             os: windows-2022
             runtime: win-arm64
-          - name: macOS (Apple Silicon)
-            os: macos-latest
-            runtime: osx-arm64
           - name: Linux
             os: ubuntu-latest
             runtime: linux-x64
@@ -92,7 +89,7 @@ jobs:
         if: startsWith(matrix.runtime, 'linux-')
         run: mv publish/SourceGit publish/sourcegit
       - name: Tar artifact
-        if: startsWith(matrix.runtime, 'linux-') || startsWith(matrix.runtime, 'osx-')
+        if: startsWith(matrix.runtime, 'linux-')
         run: |
           tar -cvf "sourcegit.${{ matrix.runtime }}.tar" -C publish .
           rm -r publish/*

@@ -36,37 +36,6 @@ jobs:
         uses: geekyeggo/delete-artifact@v6
         with:
           name: sourcegit.${{ matrix.runtime }}
-  osx-app:
-    name: Package macOS
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        runtime: [osx-arm64]
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-      - name: Download build
-        uses: actions/download-artifact@v8
-        with:
-          name: sourcegit.${{ matrix.runtime }}
-          path: build
-      - name: Package
-        env:
-          VERSION: ${{ inputs.version }}
-          RUNTIME: ${{ matrix.runtime }}
-        run: |
-          mkdir build/SourceGit
-          tar -xf "build/sourcegit.${{ matrix.runtime }}.tar" -C build/SourceGit
-          ./build/scripts/package.osx-app.sh
-      - name: Upload package artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: package.${{ matrix.runtime }}
-          path: build/sourcegit_*.zip
-      - name: Delete temp artifacts
-        uses: geekyeggo/delete-artifact@v6
-        with:
-          name: sourcegit.${{ matrix.runtime }}
   linux:
     name: Package Linux
     runs-on: ubuntu-latest
