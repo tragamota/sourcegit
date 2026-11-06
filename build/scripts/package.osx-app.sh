@@ -16,7 +16,6 @@ rm -f SourceGit.app/Contents/MacOS/*.pdb
 
 case "$RUNTIME" in
   osx-arm64) ARCH=arm64 ;;
-  osx-x64)   ARCH=x86_64 ;;
   *) echo "Unsupported RUNTIME: $RUNTIME" >&2; exit 1 ;;
 esac
 
